@@ -6,3 +6,4 @@ Welcome! This repository contains our work related to the kaggle competition "Tw
 Follow the following steps to have a complete repository:
 - Create a virtualenvironment 
 - Download the data from the kaggle website (https://www.kaggle.com/c/tweet-sentiment-extraction/data) and store it locally in the folder `./data/`
+- We use `pytest` (https://docs.pytest.org/en/6.2.x/) for unit and integration tests.
