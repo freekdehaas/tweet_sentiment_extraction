@@ -1,19 +1,38 @@
-name: tweet_sentiment_extraction
+name: CML
 on: [push]
 jobs:
-  run:
-    runs-on: [ubuntu-latest]
-    container: docker://dvcorg/cml-py3:latest
+  deploy-runner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: iterative/setup-cml@v1
+      - uses: actions/checkout@v2
+      - name: Deploy runner on EC2
+        env:
+          REPO_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          cml runner \
+              --cloud=aws \
+              --cloud-region=us-west \
+              --cloud-type=t2.small \
+              --labels=cml_aws
+  train-model:
+    needs: deploy-runner
+    runs-on: [self-hosted, cml-aws]
+    timeout-minutes: 4320 # 72h
+    container:
+      image: docker://iterativeai/cml:latest
     steps:
       - uses: actions/checkout@v2
-      - name: cml_run
+      - name: Train model
         env:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-        run:
-
-          # Your ML workflow goes here
+          REPO_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        run: |
           pip install -r requirements.txt
-          python train.py
-
-          echo "MODEL METRICS"
-          cat metrics.txt
+          dvc pull
+          
+          # Create CML report
+          cat metrics.txt >> report.md
+          cml publish doge.jpeg --md --title="Tweets are cool" >> report.md
+          cml send-comment report.md
