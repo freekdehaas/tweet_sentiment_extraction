@@ -1,17 +1,17 @@
 import torch.nn as nn
-from transformers import AlbertForQuestionAnswering
+from transformers import AutoModelForQuestionAnswering
 
 
 class TextModel(nn.Module):
     def __init__(self):
         super(TextModel, self).__init__()
         # RoBERTa encoder
-        self.model = AlbertForQuestionAnswering.from_pretrained("albert-base-v2")
+        self.model = AutoModelForQuestionAnswering.from_pretrained("albert-base-v2")
 
         for param in self.model.parameters():
             param.requires_grad = True
 
-    def forward(self, ids, masks):  # , token_type_ids
+    def forward(self, ids, masks, start_idx, end_idx):  # , token_type_ids
         """
         start_scores torch.FloatTensor of shape (batch_size, sequence_length,)
         Span-start scores (before SoftMax).
@@ -21,6 +21,11 @@ class TextModel(nn.Module):
 
 
         """
-        start_logits, end_logits = self.model(input_ids=ids, attention_mask=masks)
+        output = self.model(
+            input_ids=ids,
+            attention_mask=masks,
+            start_positions=start_idx,
+            end_positions=end_idx,
+        )
 
-        return start_logits, end_logits
+        return output

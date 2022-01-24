@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 # Pytorch
-from transformers import AlbertTokenizer
+from transformers import AlbertTokenizer, AutoTokenizer
 from torch.utils.data import Dataset, DataLoader
 import torch
 
@@ -30,8 +30,8 @@ class TextDataset(Dataset):
         # data loading
         self.df = df
         self.selected_text = "selected_text" in df
-        self.tokenizer = AlbertTokenizer.from_pretrained("albert-base-v2")
-        self.max_length = opt.max_length
+        self.tokenizer = tokenizer
+        self.max_length = max_length
 
     def __len__(self):
         # len(dataset) i.e., the total number of samples
@@ -40,13 +40,15 @@ class TextDataset(Dataset):
     def get_data(self, row):
         # processing the data
         text = " " + " ".join(row.text.lower().split())  # clean the text
-        encoded_input = self.tokenizer.encode(text)  # the sentence to be encoded
+        tokenized_input = self.tokenizer(
+            row.sentiment, text, return_offsets_mapping=True
+        )  # the sentence to be encoded
 
-        sentiment_id = {
-            "positive": 1313,
-            "negative": 2430,
-            "neutral": 7974,
-        }  # stating the ids of the sentiment values
+        # sentiment_id = {
+        #     "positive": 1313,
+        #     "negative": 2430,
+        #     "neutral": 7974,
+        # }  # stating the ids of the sentiment values
 
         # print ([list((i, encoded_input[i])) for i in range(len(encoded_input))])
         """
@@ -66,9 +68,9 @@ class TextDataset(Dataset):
         # [CLS] ...sentence1 tokens... [SEP]..sentence2 tokens... [SEP]
         """
 
-        input_ids = (
-            [101] + [sentiment_id[row.sentiment]] + [102] + encoded_input.ids + [102]
-        )
+        # input_ids = (
+        #     [101] + [sentiment_id[row.sentiment]] + [102] + encoded_input.ids + [102]
+        # )
 
         """
         id: unique identifier for each token
@@ -76,16 +78,14 @@ class TextDataset(Dataset):
         """
 
         # ID offsets
-        offsets = (
-            [(0, 0)] * 3 + encoded_input.offsets + [(0, 0)]
-        )  # since first 3 are [CLS] ...sentiment tokens... [SEP]
-
-        pad_len = self.max_length - len(input_ids)
+        offsets = tokenized_input["offset_mapping"]
+        encoded_input = tokenized_input["input_ids"]
+        pad_len = self.max_length - len(tokenized_input["input_ids"])
         if pad_len > 0:
-            input_ids += [0] * pad_len
+            encoded_input = tokenized_input["input_ids"] + [0] * pad_len
             offsets += [(0, 0)] * pad_len
 
-        input_ids = torch.tensor(input_ids, dtype=torch.long)
+        input_ids = torch.tensor(encoded_input, dtype=torch.long)
 
         # The mask has 1 for real tokens and 0 for padding tokens. Only real tokens are attended to.
         masks = torch.where(input_ids != 0, torch.tensor(1), torch.tensor(0))
@@ -164,12 +164,12 @@ class TextDataset(Dataset):
         return data
 
 
-def train_val_dataloaders(df, train_idx, val_idx, batch_size, tokenizer):
+def train_val_dataloaders(df, train_idx, val_idx, batch_size):
     train_df = df.iloc[train_idx]
     val_df = df.iloc[val_idx]
-
+    albert_tokenizer = AutoTokenizer.from_pretrained("albert-base-v2")
     train_loader = torch.utils.data.DataLoader(
-        TextDataset(train_df, tokenizer, opt.max_lenght),
+        TextDataset(train_df, albert_tokenizer, opt.max_lenght),
         batch_size=batch_size,
         shuffle=True,
         num_workers=0,  # to avoid multi-process, keep it at 0
@@ -177,7 +177,7 @@ def train_val_dataloaders(df, train_idx, val_idx, batch_size, tokenizer):
     )
 
     val_loader = torch.utils.data.DataLoader(
-        TextDataset(val_df, tokenizer, opt.max_lenght),
+        TextDataset(val_df, albert_tokenizer, opt.max_lenght),
         batch_size=batch_size,
         shuffle=False,
         num_workers=0,
@@ -188,9 +188,10 @@ def train_val_dataloaders(df, train_idx, val_idx, batch_size, tokenizer):
     return dataloaders_dict
 
 
-def test_loader(df, tokenizer, batch_size=opt.test_batch_size):
+def test_loader(df, batch_size=opt.test_batch_size):
+    albert_tokenizer = AlbertTokenizer.from_pretrained("albert-base-v2")
     loader = torch.utils.data.DataLoader(
-        TextDataset(test_df, tokenizer, opt.max_lenght),
+        TextDataset(test_df, albert_tokenizer, opt.max_lenght),
         batch_size=batch_size,
         shuffle=False,
         num_workers=0,

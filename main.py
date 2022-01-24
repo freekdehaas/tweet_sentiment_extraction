@@ -46,7 +46,16 @@ def loss_function(start_logits, end_logits, start_positions, end_positions):
     return total_loss
 
 
-def train(model, dataloaders_dict, optimizer, num_epochs, scheduler, device, filename):
+def train(
+    tokenizer,
+    model,
+    dataloaders_dict,
+    optimizer,
+    num_epochs,
+    scheduler,
+    device,
+    filename,
+):
     """
     Train pytorch model on a single pass through the data loader.
 
@@ -112,9 +121,9 @@ def train(model, dataloaders_dict, optimizer, num_epochs, scheduler, device, fil
 
                 with torch.set_grad_enabled(key == "train"):
 
-                    start_logits, end_logits = model(ids, masks)
+                    output = model(ids, masks, start_idx=start_idx, end_idx=end_idx)
 
-                    loss = loss_function(start_logits, end_logits, start_idx, end_idx)
+                    loss = output.loss
 
                     if key == "train":
                         if idx != 0:
@@ -132,17 +141,15 @@ def train(model, dataloaders_dict, optimizer, num_epochs, scheduler, device, fil
                     # detaching these outputs so that the backward passes stop at this point
                     start_idx = start_idx.cpu().detach().numpy()
                     end_idx = end_idx.cpu().detach().numpy()
-                    start_logits = (
-                        torch.softmax(start_logits, dim=1).cpu().detach().numpy()
-                    )
-                    end_logits = torch.softmax(end_logits, dim=1).cpu().detach().numpy()
-
+                    start_logits = output.start_logits.cpu().detach().numpy()
+                    end_logits = output.end_logits.cpu().detach().numpy()
                     selected_text = data["selected_text"]
 
                     filtered_sentences = []
                     for i, t_data in enumerate(text):
                         # for i in range(len(ids)):
                         jaccard_score, filtered_output = utils.find_jaccard_score(
+                            tokenizer,
                             t_data,
                             selected_text[i],
                             sentiment[i],
@@ -177,6 +184,8 @@ def train(model, dataloaders_dict, optimizer, num_epochs, scheduler, device, fil
 
 
 # stratifiedKfold validation
+seed = 3
+tokenizer = AlbertTokenizer.from_pretrained("albert-base-v2")
 skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=seed)
 for fold, (idxTrain, idxVal) in enumerate(
     skf.split(train_df, train_df.sentiment), start=1
@@ -201,6 +210,7 @@ for fold, (idxTrain, idxVal) in enumerate(
         num_training_steps=num_training_steps,
     )
     train(
+        tokenizer,
         model,
         dataloaders_dict,
         optimizer,
@@ -211,7 +221,6 @@ for fold, (idxTrain, idxVal) in enumerate(
     )
 
 t_loader = test_loader(test_df)
-tokenizer = AlbertTokenizer.from_pretrained("albert-base-v2")
 predictions = []
 models = []
 for fold in range(skf.n_splits):

@@ -3,7 +3,7 @@ from email.policy import default
 
 
 def parse_opt():
-    parser = argparse.argparse.ArgumentParser()
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         "--train_data",
         default="./data/",
