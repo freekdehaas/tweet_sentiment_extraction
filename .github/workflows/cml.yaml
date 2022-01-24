@@ -16,10 +16,10 @@ jobs:
               --cloud=aws \
               --cloud-region=us-west \
               --cloud-type=t2.small \
-              --labels=cml_aws
+              --labels=cml-gpu
   train-model:
     needs: deploy-runner
-    runs-on: [self-hosted, cml-aws]
+    runs-on: [self-hosted, cml-gpu]
     timeout-minutes: 4320 # 72h
     container:
       image: docker://iterativeai/cml:latest
@@ -30,9 +30,9 @@ jobs:
           REPO_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         run: |
           pip install -r requirements.txt
-          dvc pull
-          
+          python train.py
+
           # Create CML report
           cat metrics.txt >> report.md
-          cml publish doge.jpeg --md --title="Tweets are cool" >> report.md
+          cml publish Doge.jpeg --md --title="Is this working?" >> report.md
           cml send-comment report.md
