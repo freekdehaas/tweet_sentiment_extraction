@@ -30,9 +30,8 @@ jobs:
           REPO_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         run: |
           pip install -r requirements.txt
-          python train.py
 
           # Create CML report
           cat metrics.txt >> report.md
-          cml publish Doge.jpeg --md --title="Is this working?" >> report.md
+          cml publish doge.jpeg --md --title="Tweets are cool" >> report.md
           cml send-comment report.md
